@@ -1,0 +1,52 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String        @id @default(cuid())
+  email        String        @unique
+  name         String?
+  passwordHash String
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  files        StoredFile[]
+  history      FileHistory[]
+}
+
+model StoredFile {
+  id           String        @id @default(uuid())
+  userId       String?
+  user         User?         @relation(fields: [userId], references: [id], onDelete: SetNull)
+  originalName String
+  storedName   String
+  mimeType     String
+  size         Int
+  category     String
+  createdAt    DateTime      @default(now())
+  history      FileHistory[]
+
+  @@index([userId])
+  @@index([createdAt])
+}
+
+model FileHistory {
+  id             String      @id @default(cuid())
+  userId         String?
+  user           User?       @relation(fields: [userId], references: [id], onDelete: SetNull)
+  storedFileId   String?
+  storedFile     StoredFile? @relation(fields: [storedFileId], references: [id], onDelete: SetNull)
+  tool           String
+  inputFileIds   String      @default("[]")
+  outputFileName String?
+  outputSize     Int?
+  status         String      @default("completed")
+  errorMessage   String?
+  createdAt      DateTime    @default(now())
+
+  @@index([userId, createdAt])
+}
