@@ -1,0 +1,22 @@
+# Firebase App Hosting config (Next.js full-stack — API routes, auth, PDF tools)
+# Docs: https://firebase.google.com/docs/app-hosting/configure
+
+runConfig:
+  minInstances: 0
+  maxInstances: 4
+  concurrency: 80
+  cpu: 1
+  memoryMiB: 1024
+
+# Set secrets in Firebase Console → App Hosting → your backend → Environment
+env:
+  - variable: DATABASE_URL
+    secret: DATABASE_URL
+  - variable: AUTH_SECRET
+    secret: AUTH_SECRET
+  - variable: AUTH_URL
+    secret: AUTH_URL
+  - variable: SITE_URL
+    secret: SITE_URL
+  - variable: NODE_ENV
+    value: production

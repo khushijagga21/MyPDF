@@ -6,6 +6,8 @@
     "dev": "next dev",
     "dev:turbo": "next dev --turbopack",
     "build": "prisma generate && prisma db push --skip-generate && next build",
+    "build:firebase": "prisma generate && next build",
+    "deploy:firebase": "firebase deploy --only hosting",
     "postinstall": "prisma generate",
     "start": "next start",
     "start:prod": "prisma db push && next start",
@@ -54,6 +56,7 @@
     "@types/react-dom": "^19.2.3",
     "eslint": "^9",
     "eslint-config-next": "^15.5.19",
+    "firebase-tools": "^14.0.0",
     "tailwindcss": "^4",
     "typescript": "^5"
   }

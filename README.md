@@ -80,6 +80,21 @@ Render free web tier **sleeps** after 15 min with no visitors (first visit may t
 
 ---
 
+## Firebase App Hosting
+
+MyPDF needs **server-side** APIs (not static hosting alone). Use **Firebase App Hosting** on the **Blaze** plan.
+
+Full step-by-step guide: **[FIREBASE.md](./FIREBASE.md)**
+
+Quick steps:
+1. [Firebase Console](https://console.firebase.google.com/) → create project → **Blaze** plan
+2. **App Hosting** → connect GitHub repo `khushijagga21/MyPDF`
+3. Build command: `npm ci && npm run build:firebase`
+4. Add secrets: `DATABASE_URL`, `AUTH_SECRET`, `AUTH_URL`, `SITE_URL`
+5. Deploy from `main` branch
+
+---
+
 ## Paid / more stable: Railway
 
 
