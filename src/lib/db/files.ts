@@ -162,7 +162,7 @@ export async function logFileHistory(input: LogHistoryInput): Promise<void> {
 export async function getUserFiles(userId: string) {
   if (!isDatabaseConfigured()) return [];
   return prisma.storedFile.findMany({
-    where: { userId },
+    where: { userId, role: "upload" },
     orderBy: { createdAt: "desc" },
     take: 100,
   });
@@ -176,6 +176,9 @@ export async function getUserHistory(userId: string) {
     take: 100,
     include: {
       storedFile: {
+        select: { id: true, originalName: true, mimeType: true, size: true },
+      },
+      outputStoredFile: {
         select: { id: true, originalName: true, mimeType: true, size: true },
       },
     },

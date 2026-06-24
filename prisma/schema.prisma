@@ -28,27 +28,33 @@ model StoredFile {
   mimeType     String
   size         Int
   category     String
+  /// "upload" = source file the user provided; "output" = processed result
+  role         String        @default("upload")
   data         Bytes?
   createdAt    DateTime      @default(now())
-  history      FileHistory[]
+  inputHistory  FileHistory[] @relation("InputFile")
+  outputHistory FileHistory[] @relation("OutputFile")
 
   @@index([userId])
+  @@index([userId, role])
   @@index([createdAt])
 }
 
 model FileHistory {
-  id             String      @id @default(cuid())
-  userId         String?
-  user           User?       @relation(fields: [userId], references: [id], onDelete: SetNull)
-  storedFileId   String?
-  storedFile     StoredFile? @relation(fields: [storedFileId], references: [id], onDelete: SetNull)
-  tool           String
-  inputFileIds   String      @default("[]")
-  outputFileName String?
-  outputSize     Int?
-  status         String      @default("completed")
-  errorMessage   String?
-  createdAt      DateTime    @default(now())
+  id                 String      @id @default(cuid())
+  userId             String?
+  user               User?       @relation(fields: [userId], references: [id], onDelete: SetNull)
+  storedFileId       String?
+  storedFile         StoredFile? @relation("InputFile", fields: [storedFileId], references: [id], onDelete: SetNull)
+  outputStoredFileId String?
+  outputStoredFile   StoredFile? @relation("OutputFile", fields: [outputStoredFileId], references: [id], onDelete: SetNull)
+  tool               String
+  inputFileIds       String      @default("[]")
+  outputFileName     String?
+  outputSize         Int?
+  status             String      @default("completed")
+  errorMessage       String?
+  createdAt          DateTime    @default(now())
 
   @@index([userId, createdAt])
 }

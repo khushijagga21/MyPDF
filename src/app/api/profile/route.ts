@@ -45,6 +45,13 @@ export async function GET() {
         outputSize: h.outputSize,
         createdAt: h.createdAt.toISOString(),
         sourceFile: h.storedFile,
+        outputFile: h.outputStoredFile,
+        outputDownloadUrl: h.outputStoredFile
+          ? `/api/upload/${h.outputStoredFile.id}`
+          : null,
+        sourceDownloadUrl: h.storedFile
+          ? `/api/upload/${h.storedFile.id}`
+          : null,
         inputFileIds: parseInputFileIds(h.inputFileIds),
       })),
     });

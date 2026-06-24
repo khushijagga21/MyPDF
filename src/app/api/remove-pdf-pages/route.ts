@@ -3,7 +3,7 @@ import { removePdfPages } from "@/lib/pdf/remove-pages";
 import type { RemovePdfPagesRequest } from "@/lib/pdf/types";
 import { PdfUploadError } from "@/lib/api/parse-pdf-upload";
 import { readUploadedFileBuffer } from "@/lib/upload/storage";
-import { logToolJob } from "@/lib/db/log-tool-job";
+import { saveToolArtifacts } from "@/lib/db/save-tool-artifacts";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -29,7 +29,7 @@ async function resolveRemoveInput(request: Request) {
       body.baseName?.replace(/\.pdf$/i, "") ||
       (file.name || "document").replace(/\.pdf$/i, "");
 
-    return { body, bytes, baseName, fileId: undefined as string | undefined };
+    return { body, bytes, baseName, fileId: undefined as string | undefined, inputName: file.name || "document.pdf" };
   }
 
   const body = (await request.json()) as RemovePdfPagesRequest;
@@ -51,31 +51,43 @@ async function resolveRemoveInput(request: Request) {
     bytes: new Uint8Array(result.buffer),
     baseName,
     fileId: body.fileId,
+    inputName: result.meta.originalName,
   };
 }
 
 export async function POST(request: Request) {
   try {
-    const { body, bytes, baseName, fileId } = await resolveRemoveInput(request);
+    const { body, bytes, baseName, fileId, inputName } = await resolveRemoveInput(request);
 
     const pdfBytes = await removePdfPages(
       bytes,
       body.removePages.map(Number).filter((n) => Number.isFinite(n))
     );
 
-    await logToolJob({
+    const outputFileName = `${baseName}-edited.pdf`;
+
+    await saveToolArtifacts({
       tool: "remove-pdf-pages",
-      inputFileIds: fileId ? [fileId] : [],
-      storedFileId: fileId ?? null,
-      outputFileName: `${baseName}-edited.pdf`,
-      outputSize: pdfBytes.length,
+      input: fileId
+        ? undefined
+        : {
+            buffer: Buffer.from(bytes),
+            fileName: inputName,
+            mimeType: "application/pdf",
+          },
+      inputFileIds: fileId ? [fileId] : undefined,
+      output: {
+        buffer: Buffer.from(pdfBytes),
+        fileName: outputFileName,
+        mimeType: "application/pdf",
+      },
     });
 
     return new NextResponse(Buffer.from(pdfBytes), {
       status: 200,
       headers: {
         "Content-Type": "application/pdf",
-        "Content-Disposition": `attachment; filename="${baseName}-edited.pdf"`,
+        "Content-Disposition": `attachment; filename="${outputFileName}"`,
         "Cache-Control": "no-store",
       },
     });

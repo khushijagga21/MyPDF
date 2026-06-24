@@ -6,7 +6,7 @@ import {
   readPdfFilesFromFormData,
 } from "@/lib/api/parse-pdf-upload";
 import { readUploadedFileBuffer } from "@/lib/upload/storage";
-import { logToolJob } from "@/lib/db/log-tool-job";
+import { saveToolArtifacts } from "@/lib/db/save-tool-artifacts";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -151,14 +151,35 @@ export async function POST(request: Request) {
       }
     }
 
-    await logToolJob({
+    const outputFileName = "merged-document.pdf";
+    const outputBuffer = Buffer.from(mergedBytes);
+
+    let localInputs:
+      | Array<{ buffer: Buffer; fileName: string; mimeType: string }>
+      | undefined;
+
+    if (resolved.kind === "local-files" || resolved.kind === "local-pages") {
+      localInputs = await Promise.all(
+        resolved.files.map(async (file) => ({
+          buffer: Buffer.from(await file.arrayBuffer()),
+          fileName: file.name,
+          mimeType: file.type || "application/pdf",
+        }))
+      );
+    }
+
+    await saveToolArtifacts({
       tool: "merge-pdf",
-      inputFileIds: inputIds,
-      outputFileName: "merged-document.pdf",
-      outputSize: mergedBytes.length,
+      inputs: localInputs,
+      inputFileIds: inputIds.length > 0 ? inputIds : undefined,
+      output: {
+        buffer: outputBuffer,
+        fileName: outputFileName,
+        mimeType: "application/pdf",
+      },
     });
 
-    return new NextResponse(Buffer.from(mergedBytes), {
+    return new NextResponse(outputBuffer, {
       status: 200,
       headers: {
         "Content-Type": "application/pdf",

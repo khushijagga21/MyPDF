@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { pdfToWordFromBuffer } from "@/lib/word/pdf-to-word";
 import { parsePdfFromRequest, PdfUploadError } from "@/lib/api/parse-pdf-upload";
-import { logToolJob } from "@/lib/db/log-tool-job";
+import { saveToolArtifacts } from "@/lib/db/save-tool-artifacts";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -14,11 +14,18 @@ export async function POST(request: Request) {
     const baseName = originalName.replace(/\.pdf$/i, "") || "document";
     const fileName = `${baseName}.docx`;
 
-    await logToolJob({
+    await saveToolArtifacts({
       tool: "pdf-to-word",
-      inputFileIds: fileId ? [fileId] : [],
-      outputFileName: fileName,
-      outputSize: arrayBuffer.byteLength,
+      input: fileId
+        ? undefined
+        : { buffer, fileName: originalName, mimeType: "application/pdf" },
+      inputFileIds: fileId ? [fileId] : undefined,
+      output: {
+        buffer: Buffer.from(arrayBuffer),
+        fileName,
+        mimeType:
+          "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      },
     });
 
     return new NextResponse(arrayBuffer, {

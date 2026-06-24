@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { imagesToPptx } from "@/lib/pdf/pdf-to-pptx";
-import { logToolJob } from "@/lib/db/log-tool-job";
+import { saveToolArtifacts } from "@/lib/db/save-tool-artifacts";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -24,11 +24,16 @@ export async function POST(request: Request) {
     const baseName = body.baseName?.replace(/\.pdf$/i, "") || "document";
     const buffer = await imagesToPptx(body.images, baseName);
 
-    await logToolJob({
+    const outputFileName = `${baseName}.pptx`;
+
+    await saveToolArtifacts({
       tool: "pdf-to-powerpoint",
-      inputFileIds: [],
-      outputFileName: `${baseName}.pptx`,
-      outputSize: buffer.length,
+      output: {
+        buffer: Buffer.from(buffer),
+        fileName: outputFileName,
+        mimeType:
+          "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+      },
     });
 
     return new NextResponse(new Uint8Array(buffer), {
@@ -36,7 +41,7 @@ export async function POST(request: Request) {
       headers: {
         "Content-Type":
           "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-        "Content-Disposition": `attachment; filename="${baseName}.pptx"`,
+        "Content-Disposition": `attachment; filename="${outputFileName}"`,
         "Cache-Control": "no-store",
       },
     });

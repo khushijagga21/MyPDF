@@ -10,7 +10,7 @@ import {
   PdfUploadError,
 } from "@/lib/api/parse-pdf-upload";
 import { readUploadedFileBuffer } from "@/lib/upload/storage";
-import { logToolJob } from "@/lib/db/log-tool-job";
+import { saveToolArtifacts } from "@/lib/db/save-tool-artifacts";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -60,6 +60,7 @@ async function resolveSplitInput(request: Request) {
       bytes,
       baseName: (file.name || "document").replace(/\.pdf$/i, ""),
       fileId: undefined as string | undefined,
+      inputName: file.name || "document.pdf",
     };
   }
 
@@ -74,14 +75,26 @@ async function resolveSplitInput(request: Request) {
     bytes: loaded.bytes,
     baseName: loaded.baseName,
     fileId: loaded.fileId,
+    inputName: loaded.baseName + ".pdf",
   };
 }
 
 export async function POST(request: Request) {
   try {
-    const { body, bytes, baseName: defaultBaseName, fileId } =
+    const { body, bytes, baseName: defaultBaseName, fileId, inputName } =
       await resolveSplitInput(request);
     const baseName = body.baseName?.replace(/\.pdf$/i, "") || defaultBaseName;
+
+    const saveInput = {
+      input: fileId
+        ? undefined
+        : {
+            buffer: Buffer.from(bytes),
+            fileName: inputName,
+            mimeType: "application/pdf",
+          },
+      inputFileIds: fileId ? [fileId] : undefined,
+    };
 
     if (body.mode === "range") {
       const from = Number(body.from);
@@ -96,18 +109,23 @@ export async function POST(request: Request) {
 
       const pdfBytes = await extractPageRange(bytes, from, to);
 
-      await logToolJob({
+      const outputFileName = `${baseName}-pages-${from}-${to}.pdf`;
+
+      await saveToolArtifacts({
         tool: "split-pdf",
-        inputFileIds: fileId ? [fileId] : [],
-        outputFileName: `${baseName}-pages-${from}-${to}.pdf`,
-        outputSize: pdfBytes.length,
+        ...saveInput,
+        output: {
+          buffer: Buffer.from(pdfBytes),
+          fileName: outputFileName,
+          mimeType: "application/pdf",
+        },
       });
 
       return new NextResponse(Buffer.from(pdfBytes), {
         status: 200,
         headers: {
           "Content-Type": "application/pdf",
-          "Content-Disposition": `attachment; filename="${baseName}-pages-${from}-${to}.pdf"`,
+          "Content-Disposition": `attachment; filename="${outputFileName}"`,
           "Cache-Control": "no-store",
         },
       });
@@ -125,18 +143,23 @@ export async function POST(request: Request) {
       const parts = await splitEveryNPages(bytes, every, baseName);
       const zipBytes = await packPdfsToZip(parts);
 
-      await logToolJob({
+      const outputFileName = `${baseName}-split.zip`;
+
+      await saveToolArtifacts({
         tool: "split-pdf",
-        inputFileIds: fileId ? [fileId] : [],
-        outputFileName: `${baseName}-split.zip`,
-        outputSize: zipBytes.length,
+        ...saveInput,
+        output: {
+          buffer: Buffer.from(zipBytes),
+          fileName: outputFileName,
+          mimeType: "application/zip",
+        },
       });
 
       return new NextResponse(Buffer.from(zipBytes), {
         status: 200,
         headers: {
           "Content-Type": "application/zip",
-          "Content-Disposition": `attachment; filename="${baseName}-split.zip"`,
+          "Content-Disposition": `attachment; filename="${outputFileName}"`,
           "Cache-Control": "no-store",
         },
       });
@@ -151,18 +174,23 @@ export async function POST(request: Request) {
       const parts = await splitIndividualPages(bytes, baseName, pages);
       const zipBytes = await packPdfsToZip(parts);
 
-      await logToolJob({
+      const outputFileName = `${baseName}-pages.zip`;
+
+      await saveToolArtifacts({
         tool: "split-pdf",
-        inputFileIds: fileId ? [fileId] : [],
-        outputFileName: `${baseName}-pages.zip`,
-        outputSize: zipBytes.length,
+        ...saveInput,
+        output: {
+          buffer: Buffer.from(zipBytes),
+          fileName: outputFileName,
+          mimeType: "application/zip",
+        },
       });
 
       return new NextResponse(Buffer.from(zipBytes), {
         status: 200,
         headers: {
           "Content-Type": "application/zip",
-          "Content-Disposition": `attachment; filename="${baseName}-pages.zip"`,
+          "Content-Disposition": `attachment; filename="${outputFileName}"`,
           "Cache-Control": "no-store",
         },
       });
