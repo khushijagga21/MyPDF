@@ -21,7 +21,7 @@ const nextConfig: NextConfig = {
   experimental: {
     optimizePackageImports: ["lucide-react", "framer-motion"],
   },
-  serverExternalPackages: ["pptxgenjs", "docx", "mammoth", "xlsx"],
+  serverExternalPackages: ["pptxgenjs", "docx", "mammoth", "xlsx", "dommatrix"],
   async redirects() {
     return toolShortUrls
       .filter(({ source, destination }) => source !== destination)
