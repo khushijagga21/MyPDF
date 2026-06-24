@@ -7,7 +7,7 @@ import { NavigationProgress } from "@/components/layout/navigation-progress";
 import { GradientBackground } from "@/components/layout/gradient-background";
 import { Header } from "@/components/layout/header";
 import { Footer } from "@/components/layout/footer";
-import { BRAND_NAME, BRAND_TAGLINE } from "@/lib/brand";
+import { BRAND_NAME, BRAND_TAGLINE, getSiteUrl } from "@/lib/brand";
 
 const outfit = Outfit({
   variable: "--font-outfit",
@@ -15,6 +15,7 @@ const outfit = Outfit({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL(getSiteUrl()),
   title: {
     default: `${BRAND_NAME} — ${BRAND_TAGLINE}`,
     template: `%s | ${BRAND_NAME}`,

@@ -5,9 +5,10 @@
   "scripts": {
     "dev": "next dev --turbopack",
     "dev:webpack": "next dev",
-    "build": "prisma db push && next build",
+    "build": "prisma generate && next build",
     "postinstall": "prisma generate",
     "start": "next start",
+    "start:prod": "prisma db push && next start",
     "lint": "eslint",
     "clean": "node -e \"require('fs').rmSync('.next',{recursive:true,force:true})\"",
     "db:generate": "prisma generate",
@@ -41,7 +42,8 @@
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
     "tailwind-merge": "^3.6.0",
-    "xlsx": "^0.18.5"
+    "xlsx": "^0.18.5",
+    "prisma": "^5.22.0"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
@@ -51,7 +53,6 @@
     "@types/react-dom": "^19.2.3",
     "eslint": "^9",
     "eslint-config-next": "^15.5.19",
-    "prisma": "^5.22.0",
     "tailwindcss": "^4",
     "typescript": "^5"
   }

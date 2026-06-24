@@ -1,4 +1,5 @@
 import type { UploadCategory, UploadedFileRecord } from "@/lib/upload/types";
+import { FILE_TTL_MS } from "@/lib/upload/config";
 import { isDatabaseConfigured, prisma } from "@/lib/db/prisma";
 
 export async function persistFileRecord(
@@ -41,6 +42,16 @@ export async function readFileDataFromDb(id: string): Promise<Buffer | null> {
 export async function removeFileRecord(id: string): Promise<void> {
   if (!isDatabaseConfigured()) return;
   await prisma.storedFile.deleteMany({ where: { id } });
+}
+
+/** Remove uploaded file data older than FILE_TTL_MS to free database space. */
+export async function cleanupExpiredFiles(): Promise<number> {
+  if (!isDatabaseConfigured()) return 0;
+  const cutoff = new Date(Date.now() - FILE_TTL_MS);
+  const result = await prisma.storedFile.deleteMany({
+    where: { createdAt: { lt: cutoff } },
+  });
+  return result.count;
 }
 
 export async function getFileOwnerId(id: string): Promise<string | null> {

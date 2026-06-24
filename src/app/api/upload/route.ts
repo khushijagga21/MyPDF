@@ -5,7 +5,7 @@ import { CATEGORY_LIMITS } from "@/lib/upload/config";
 import { sanitizeFileName, validateFile } from "@/lib/upload/validation";
 import { ensureUploadDirs, saveUploadedFile } from "@/lib/upload/storage";
 import { getSessionUserId } from "@/lib/auth/session";
-import { logFileHistory } from "@/lib/db/files";
+import { cleanupExpiredFiles, logFileHistory } from "@/lib/db/files";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -89,6 +89,10 @@ export async function POST(request: Request) {
     } catch (historyErr) {
       console.error("[upload POST] history log failed", historyErr);
     }
+
+    void cleanupExpiredFiles().catch((err) =>
+      console.error("[upload POST] cleanup failed", err)
+    );
 
     return NextResponse.json(record, { status: 201 });
   } catch (err) {

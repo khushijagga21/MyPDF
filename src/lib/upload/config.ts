@@ -2,11 +2,19 @@ import type { UploadCategory } from "@/lib/upload/types";
 
 export const UPLOAD_DIR = "uploads";
 
-/** Vercel serverless has a read-only filesystem — store file bytes in PostgreSQL instead. */
+/** Uploaded files expire after 24 hours (keeps database storage healthy). */
+export const FILE_TTL_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * Production uses PostgreSQL for file bytes (works on Vercel, Railway, Render).
+ * Local dev uses the uploads/ folder unless UPLOAD_STORAGE=database.
+ */
 export function useDatabaseFileStorage(): boolean {
-  return (
-    process.env.VERCEL === "1" || process.env.UPLOAD_STORAGE === "database"
-  );
+  if (process.env.UPLOAD_STORAGE === "filesystem") return false;
+  if (process.env.UPLOAD_STORAGE === "database") return true;
+  if (process.env.NODE_ENV !== "production") return false;
+  const url = process.env.DATABASE_URL ?? "";
+  return url.startsWith("postgresql://") || url.startsWith("postgres://");
 }
 
 export const MAX_FILE_SIZE_BYTES = 50 * 1024 * 1024; // 50 MB
