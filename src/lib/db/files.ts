@@ -1,6 +1,21 @@
+import { Prisma } from "@prisma/client";
 import type { UploadCategory, UploadedFileRecord } from "@/lib/upload/types";
 import { FILE_TTL_MS } from "@/lib/upload/config";
 import { isDatabaseConfigured, prisma } from "@/lib/db/prisma";
+
+async function resolveStoredFileUserId(userId?: string | null): Promise<string | null> {
+  if (!userId || !isDatabaseConfigured()) return userId ?? null;
+
+  try {
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true },
+    });
+    return user?.id ?? null;
+  } catch {
+    return null;
+  }
+}
 
 export async function persistFileRecord(
   record: UploadedFileRecord,
@@ -9,24 +24,65 @@ export async function persistFileRecord(
 ): Promise<void> {
   if (!isDatabaseConfigured()) return;
 
-  await prisma.storedFile.upsert({
-    where: { id: record.id },
-    create: {
-      id: record.id,
-      userId: userId ?? null,
-      originalName: record.originalName,
-      storedName: record.storedName,
-      mimeType: record.mimeType,
-      size: record.size,
-      category: record.category,
-      data: data ?? null,
-      createdAt: new Date(record.createdAt),
-    },
-    update: {
-      userId: userId ?? undefined,
-      ...(data !== undefined ? { data } : {}),
-    },
-  });
+  const ownerId = await resolveStoredFileUserId(userId);
+
+  try {
+    await prisma.storedFile.upsert({
+      where: { id: record.id },
+      create: {
+        id: record.id,
+        userId: ownerId,
+        originalName: record.originalName,
+        storedName: record.storedName,
+        mimeType: record.mimeType,
+        size: record.size,
+        category: record.category,
+        data: data ?? null,
+        createdAt: new Date(record.createdAt),
+      },
+      update: {
+        userId: ownerId ?? undefined,
+        ...(data !== undefined ? { data } : {}),
+      },
+    });
+  } catch (err) {
+    if (
+      err instanceof Prisma.PrismaClientKnownRequestError &&
+      err.code === "P2003" &&
+      ownerId
+    ) {
+      await prisma.storedFile.upsert({
+        where: { id: record.id },
+        create: {
+          id: record.id,
+          userId: null,
+          originalName: record.originalName,
+          storedName: record.storedName,
+          mimeType: record.mimeType,
+          size: record.size,
+          category: record.category,
+          data: data ?? null,
+          createdAt: new Date(record.createdAt),
+        },
+        update: {
+          userId: null,
+          ...(data !== undefined ? { data } : {}),
+        },
+      });
+      return;
+    }
+
+    if (
+      err instanceof Prisma.PrismaClientKnownRequestError &&
+      err.code === "P2022"
+    ) {
+      throw new Error(
+        "Database schema is out of date. Redeploy the app or run: npx prisma db push"
+      );
+    }
+
+    throw err;
+  }
 }
 
 export async function readFileDataFromDb(id: string): Promise<Buffer | null> {

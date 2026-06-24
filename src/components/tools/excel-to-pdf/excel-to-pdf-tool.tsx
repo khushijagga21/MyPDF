@@ -100,6 +100,7 @@ export function ExcelToPdfTool() {
             key={uploadKey}
             category="excel"
             multiple={false}
+            localOnly
             label="Drop your Excel file here"
             description="or click to browse your device"
             hint="Single file · Max 50 MB"

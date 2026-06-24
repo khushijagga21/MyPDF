@@ -1,6 +1,6 @@
 import { promises as fs } from "fs";
 import path from "path";
-import { UPLOAD_DIR, useDatabaseFileStorage } from "@/lib/upload/config";
+import { UPLOAD_DIR, shouldUseDatabaseFileStorage } from "@/lib/upload/config";
 import type { UploadedFileRecord } from "@/lib/upload/types";
 import {
   getFileOwnerId,
@@ -19,7 +19,7 @@ export function getUploadsPath(): string {
 }
 
 export async function ensureUploadDirs(): Promise<void> {
-  if (useDatabaseFileStorage()) return;
+  if (shouldUseDatabaseFileStorage()) return;
   await fs.mkdir(UPLOADS_PATH, { recursive: true });
   await fs.mkdir(META_DIR, { recursive: true });
 }
@@ -38,7 +38,7 @@ export async function saveUploadedFile(
   record: UploadedFileRecord,
   userId?: string | null
 ): Promise<void> {
-  if (useDatabaseFileStorage()) {
+  if (shouldUseDatabaseFileStorage()) {
     if (!isDatabaseConfigured()) {
       throw new Error("Database is not configured for file storage.");
     }
@@ -64,7 +64,7 @@ export async function getUploadedFileMeta(
     }
   }
 
-  if (useDatabaseFileStorage()) return null;
+  if (shouldUseDatabaseFileStorage()) return null;
 
   try {
     const raw = await fs.readFile(metaPath(id), "utf-8");
@@ -81,7 +81,7 @@ export async function readUploadedFileBuffer(id: string): Promise<{
   const meta = await getUploadedFileMeta(id);
   if (!meta) return null;
 
-  if (useDatabaseFileStorage()) {
+  if (shouldUseDatabaseFileStorage()) {
     const buffer = await readFileDataFromDb(id);
     if (!buffer) return null;
     return { meta, buffer };
@@ -101,7 +101,7 @@ export async function deleteUploadedFile(id: string): Promise<boolean> {
   const meta = await getUploadedFileMeta(id);
   if (!meta) return false;
 
-  if (!useDatabaseFileStorage()) {
+  if (!shouldUseDatabaseFileStorage()) {
     try {
       await fs.unlink(filePath(meta.storedName));
     } catch {

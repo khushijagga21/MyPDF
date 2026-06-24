@@ -4,7 +4,6 @@ import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { ImageDown } from "lucide-react";
 import { FileUploader } from "@/components/upload/file-uploader";
-import { deleteUploadedFileFromServer } from "@/lib/upload/client";
 import { PagePreviewGrid } from "@/components/tools/shared/page-preview-grid";
 import { OptionSelector } from "@/components/tools/shared/option-selector";
 import { DownloadPanel } from "@/components/tools/shared/download-panel";
@@ -16,67 +15,21 @@ import {
   imageQualityOptions,
   outputFormatOptions,
 } from "@/lib/data/tool-dummy";
-import { createPlaceholderImageZip, getPdfPageCount } from "@/lib/utils/download";
-import { renderPdfThumbnails } from "@/lib/pdf/thumbnails";
+import { createPlaceholderImageZip } from "@/lib/utils/download";
+import { usePdfUploadPreview } from "@/hooks/use-pdf-upload-preview";
 import { formatFileSize } from "@/lib/utils/format";
-import type { FileItemData } from "@/components/tools/shared/file-card";
 
 export function PdfToJpgTool() {
   const [uploadKey, setUploadKey] = useState(0);
-  const [file, setFile] = useState<FileItemData | null>(null);
+  const { file, previewPages, loadingThumbnails, handleFilesChange } =
+    usePdfUploadPreview();
   const [quality, setQuality] = useState("high");
   const [format, setFormat] = useState("jpg");
   const [converted, setConverted] = useState(false);
   const [processing, setProcessing] = useState(false);
   const [resultBlob, setResultBlob] = useState<Blob | null>(null);
-  const [previewPages, setPreviewPages] = useState<{ id: string; pageNumber: number; thumbnail?: string }[]>([]);
-  const [loadingThumbnails, setLoadingThumbnails] = useState(false);
 
-  const handleFilesChange = async (uploaded: FileItemData[]) => {
-    const item = uploaded[0];
-    if (!item?.file) {
-      setFile(null);
-      setPreviewPages([]);
-      return;
-    }
-    const pageCount = await getPdfPageCount(item.file);
-    setFile({ ...item, pageCount });
-    setPreviewPages(
-      Array.from({ length: pageCount }, (_, i) => ({
-        id: `page-${i + 1}`,
-        pageNumber: i + 1,
-      }))
-    );
-    setConverted(false);
-    setResultBlob(null);
-
-    setLoadingThumbnails(true);
-    try {
-      const thumbnails = await renderPdfThumbnails(item.file);
-      setPreviewPages(
-        thumbnails.map((thumbnail, i) => ({
-          id: `page-${i + 1}`,
-          pageNumber: i + 1,
-          thumbnail,
-        }))
-      );
-    } catch {
-      // Keep placeholders on failure
-    } finally {
-      setLoadingThumbnails(false);
-    }
-  };
-
-  const clearFile = async () => {
-    if (file?.serverId) {
-      try {
-        await deleteUploadedFileFromServer(file.serverId);
-      } catch {
-        // ignore
-      }
-    }
-    setFile(null);
-    setPreviewPages([]);
+  const clearFile = () => {
     setConverted(false);
     setResultBlob(null);
     setUploadKey((k) => k + 1);
@@ -114,6 +67,7 @@ export function PdfToJpgTool() {
             key={uploadKey}
             category="pdf"
             multiple={false}
+            localOnly
             label="Drop your PDF here"
             description="or click to browse your device"
             hint="Single file · Max 50 MB"
@@ -130,7 +84,7 @@ export function PdfToJpgTool() {
             <Button
               variant="outline"
               size="sm"
-              onClick={() => void clearFile()}
+              onClick={clearFile}
             >
               Change
             </Button>

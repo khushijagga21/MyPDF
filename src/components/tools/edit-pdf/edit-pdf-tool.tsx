@@ -10,10 +10,9 @@ import {
   Trash2,
 } from "lucide-react";
 import { getPdfPageCount } from "@/lib/utils/download";
-import { renderPdfThumbnails } from "@/lib/pdf/thumbnails";
-import { editPdfViaApi } from "@/lib/pdf/client";
+import { renderPdfThumbnailsProgressive } from "@/lib/pdf/thumbnails";
+import { editPdfViaFile } from "@/lib/pdf/client";
 import { FileUploader } from "@/components/upload/file-uploader";
-import { deleteUploadedFileFromServer } from "@/lib/upload/client";
 import { DownloadPanel } from "@/components/tools/shared/download-panel";
 import { GlassPanel, SectionHeading } from "@/components/tools/shared/glass-panel";
 import { SuccessToast } from "@/components/ui/success-toast";
@@ -71,13 +70,20 @@ export function EditPdfTool() {
 
     setLoadingThumbnails(true);
     try {
-      const thumbnails = await renderPdfThumbnails(item.file);
-      setPages((prev) =>
-        prev.map((page, i) => ({
-          ...page,
-          thumbnail: thumbnails[i],
-        }))
-      );
+      await renderPdfThumbnailsProgressive(item.file, {
+        scale: 0.28,
+        batchSize: 6,
+        onBatch: (batch, startIndex) => {
+          setPages((prev) => {
+            const next = [...prev];
+            batch.forEach((thumbnail, i) => {
+              const idx = startIndex + i;
+              if (next[idx]) next[idx] = { ...next[idx], thumbnail };
+            });
+            return next;
+          });
+        },
+      });
     } catch {
       // Keep placeholders if thumbnails fail
     } finally {
@@ -85,14 +91,7 @@ export function EditPdfTool() {
     }
   };
 
-  const clearFile = async () => {
-    if (file?.serverId) {
-      try {
-        await deleteUploadedFileFromServer(file.serverId);
-      } catch {
-        // ignore
-      }
-    }
+  const clearFile = () => {
     setFile(null);
     setPages([]);
     resetOutput();
@@ -126,8 +125,8 @@ export function EditPdfTool() {
   };
 
   const handleSave = async () => {
-    if (!file?.serverId) {
-      setError("File is not on the server. Please re-upload your PDF.");
+    if (!file?.file) {
+      setError("Please select a PDF file first.");
       return;
     }
     if (pages.length === 0) {
@@ -139,8 +138,7 @@ export function EditPdfTool() {
     resetOutput();
 
     try {
-      const blob = await editPdfViaApi({
-        fileId: file.serverId,
+      const blob = await editPdfViaFile(file.file, {
         pages: pages.map((p) => ({
           pageIndex: p.sourcePageIndex,
           rotation: p.rotation,
@@ -170,6 +168,7 @@ export function EditPdfTool() {
             key={uploadKey}
             category="pdf"
             multiple={false}
+            localOnly
             label="Drop your PDF here"
             description="or click to browse your device"
             hint="Single file · Max 50 MB"

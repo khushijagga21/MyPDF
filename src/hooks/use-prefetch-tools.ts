@@ -2,25 +2,26 @@
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { availableTools } from "@/lib/data/tools";
 
-/** Warm tool route JS chunks in the background after idle */
+const POPULAR_TOOL_ROUTES = ["/merge", "/compress", "/split", "/pdf-to-word"];
+
+/** Warm only the most-used tool routes — prefetching everything slows the app */
 export function usePrefetchTools() {
   const router = useRouter();
 
   useEffect(() => {
     const prefetch = () => {
-      for (const tool of availableTools) {
-        router.prefetch(tool.href);
+      for (const href of POPULAR_TOOL_ROUTES) {
+        router.prefetch(href);
       }
     };
 
     if ("requestIdleCallback" in window) {
-      const id = window.requestIdleCallback(prefetch, { timeout: 2500 });
+      const id = window.requestIdleCallback(prefetch, { timeout: 5000 });
       return () => window.cancelIdleCallback(id);
     }
 
-    const timer = setTimeout(prefetch, 1500);
+    const timer = setTimeout(prefetch, 3000);
     return () => clearTimeout(timer);
   }, [router]);
 }

@@ -60,6 +60,7 @@ export function JpgToPdfTool() {
           ref={uploaderRef}
           category="image"
           multiple
+          localOnly
           showFileList="active-only"
           label="Drop images here"
           description="or click to browse — select multiple images"

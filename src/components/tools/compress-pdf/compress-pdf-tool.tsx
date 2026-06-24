@@ -5,7 +5,6 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Minimize2 } from "lucide-react";
 import { getPdfPageCount } from "@/lib/utils/download";
 import { FileUploader } from "@/components/upload/file-uploader";
-import { deleteUploadedFileFromServer } from "@/lib/upload/client";
 import { OptionSelector } from "@/components/tools/shared/option-selector";
 import { SizeComparison } from "@/components/tools/shared/size-comparison";
 import { ProgressIndicator } from "@/components/tools/shared/progress-indicator";
@@ -62,14 +61,7 @@ export function CompressPdfTool() {
     setProgress(0);
   };
 
-  const clearFile = async () => {
-    if (file?.serverId) {
-      try {
-        await deleteUploadedFileFromServer(file.serverId);
-      } catch {
-        // ignore
-      }
-    }
+  const clearFile = () => {
     setFile(null);
     setDone(false);
     setResultBlob(null);
@@ -113,6 +105,7 @@ export function CompressPdfTool() {
             key={uploadKey}
             category="pdf"
             multiple={false}
+            localOnly
             label="Drop your PDF here"
             description="or click to browse your device"
             hint="Single file · Max 50 MB"
@@ -129,7 +122,7 @@ export function CompressPdfTool() {
             <Button
               variant="outline"
               size="sm"
-              onClick={() => void clearFile()}
+              onClick={clearFile}
             >
               Change
             </Button>

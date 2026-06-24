@@ -4,25 +4,22 @@ import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Presentation } from "lucide-react";
 import { FileUploader } from "@/components/upload/file-uploader";
-import { deleteUploadedFileFromServer } from "@/lib/upload/client";
 import { PagePreviewGrid } from "@/components/tools/shared/page-preview-grid";
 import { DownloadPanel } from "@/components/tools/shared/download-panel";
 import { GlassPanel, SectionHeading } from "@/components/tools/shared/glass-panel";
 import { SuccessToast } from "@/components/ui/success-toast";
 import { LoadingButton } from "@/components/ui/loading-button";
 import { Button } from "@/components/ui/button";
-import { getPdfPageCount } from "@/lib/utils/download";
+import { usePdfUploadPreview } from "@/hooks/use-pdf-upload-preview";
 import { renderPdfThumbnails } from "@/lib/pdf/thumbnails";
 import { pdfToPowerpointViaApi } from "@/lib/pdf/client";
 import { formatFileSize } from "@/lib/utils/format";
-import type { FileItemData } from "@/components/tools/shared/file-card";
-import type { DummyPage } from "@/lib/data/tool-dummy";
 
 export function PdfToPowerpointTool() {
   const [uploadKey, setUploadKey] = useState(0);
-  const [file, setFile] = useState<FileItemData | null>(null);
-  const [previewPages, setPreviewPages] = useState<DummyPage[]>([]);
-  const [loadingThumbnails, setLoadingThumbnails] = useState(false);
+  const { file, previewPages, handleFilesChange } = usePdfUploadPreview({
+    skipThumbnails: true,
+  });
   const [processing, setProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
@@ -38,51 +35,7 @@ export function PdfToPowerpointTool() {
     setSuccessMessage(null);
   };
 
-  const handleFilesChange = async (uploaded: FileItemData[]) => {
-    const item = uploaded[0];
-    if (!item?.file) {
-      setFile(null);
-      setPreviewPages([]);
-      return;
-    }
-
-    const pageCount = await getPdfPageCount(item.file);
-    setFile({ ...item, pageCount });
-    setPreviewPages(
-      Array.from({ length: pageCount }, (_, i) => ({
-        id: `page-${i + 1}`,
-        pageNumber: i + 1,
-      }))
-    );
-    resetOutput();
-
-    setLoadingThumbnails(true);
-    try {
-      const thumbnails = await renderPdfThumbnails(item.file, { scale: 0.5 });
-      setPreviewPages(
-        thumbnails.map((thumbnail, i) => ({
-          id: `page-${i + 1}`,
-          pageNumber: i + 1,
-          thumbnail,
-        }))
-      );
-    } catch {
-      // Keep placeholders on failure
-    } finally {
-      setLoadingThumbnails(false);
-    }
-  };
-
-  const clearFile = async () => {
-    if (file?.serverId) {
-      try {
-        await deleteUploadedFileFromServer(file.serverId);
-      } catch {
-        // ignore
-      }
-    }
-    setFile(null);
-    setPreviewPages([]);
+  const clearFile = () => {
     resetOutput();
     setUploadKey((k) => k + 1);
   };
@@ -94,7 +47,7 @@ export function PdfToPowerpointTool() {
     resetOutput();
 
     try {
-      const images = await renderPdfThumbnails(file.file, { scale: 0.75 });
+      const images = await renderPdfThumbnails(file.file, { scale: 0.6 });
       const blob = await pdfToPowerpointViaApi({
         images,
         baseName,
@@ -123,6 +76,7 @@ export function PdfToPowerpointTool() {
             key={uploadKey}
             category="pdf"
             multiple={false}
+            localOnly
             label="Drop your PDF here"
             description="or click to browse your device"
             hint="Single file · Max 50 MB"
@@ -145,7 +99,7 @@ export function PdfToPowerpointTool() {
                     {file.pageCount} slides
                   </p>
                 </div>
-                <Button variant="outline" size="sm" onClick={() => void clearFile()}>
+                <Button variant="outline" size="sm" onClick={clearFile}>
                   Change file
                 </Button>
               </div>
@@ -156,11 +110,7 @@ export function PdfToPowerpointTool() {
                 title="Preview"
                 description="Pages are placed as images on widescreen slides"
               />
-              <PagePreviewGrid
-                pages={previewPages}
-                loading={loadingThumbnails}
-                columns={3}
-              />
+              <PagePreviewGrid pages={previewPages} loading={false} columns={3} />
             </GlassPanel>
 
             <GlassPanel delay={0.1}>

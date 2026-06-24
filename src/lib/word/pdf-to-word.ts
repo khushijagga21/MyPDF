@@ -8,10 +8,10 @@ import {
 } from "docx";
 import { extractPdfPageTexts } from "@/lib/pdf/text-extract";
 
-/** Convert extracted PDF text into a Word (.docx) document */
-export async function pdfToWord(source: File): Promise<Blob> {
-  const pages = await extractPdfPageTexts(source);
-
+/** Build a Word document from extracted page texts */
+export async function buildWordDocumentFromPages(
+  pages: string[]
+): Promise<Blob> {
   if (pages.every((p) => !p.trim())) {
     throw new Error(
       "No text could be extracted. This PDF may be scanned or image-only."
@@ -42,9 +42,7 @@ export async function pdfToWord(source: File): Promise<Blob> {
     }
 
     for (const block of blocks) {
-      children.push(
-        new Paragraph({ children: [new TextRun(block)] })
-      );
+      children.push(new Paragraph({ children: [new TextRun(block)] }));
     }
   });
 
@@ -53,4 +51,12 @@ export async function pdfToWord(source: File): Promise<Blob> {
   });
 
   return Packer.toBlob(doc);
+}
+
+/** Convert a PDF buffer into a Word (.docx) document (server-only). */
+export async function pdfToWordFromBuffer(
+  pdfBytes: Uint8Array | ArrayBuffer
+): Promise<Blob> {
+  const pages = await extractPdfPageTexts(pdfBytes);
+  return buildWordDocumentFromPages(pages);
 }

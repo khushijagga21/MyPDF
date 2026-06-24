@@ -14,7 +14,10 @@ import { GlassPanel, SectionHeading } from "@/components/tools/shared/glass-pane
 import { LoadingButton } from "@/components/ui/loading-button";
 import { SuccessToast } from "@/components/ui/success-toast";
 import { Button } from "@/components/ui/button";
-import { mergePdfsViaApi } from "@/lib/pdf/client";
+import {
+  mergePdfsFromLocalFiles,
+  mergePdfsFromLocalPages,
+} from "@/lib/pdf/client";
 import {
   expandFilesToPages,
   reorderPagesByFileOrder,
@@ -146,9 +149,6 @@ export function MergePdfTool() {
 
   const selectedFiles = files.filter((f) => selectedIds.has(f.id));
 
-  const getServerId = (clientFileId: string): string | undefined =>
-    files.find((f) => f.id === clientFileId)?.serverId;
-
   const handleMerge = async () => {
     setProcessing(true);
     setError(null);
@@ -158,17 +158,22 @@ export function MergePdfTool() {
       let blob: Blob;
 
       if (organizeMode === "pages" && pagesLoaded && pages.length > 0) {
-        const apiPages = pages.map((p) => {
-          const serverId = getServerId(p.fileId);
-          if (!serverId) {
-            throw new Error(
-              `"${p.fileName}" is not on the server. Please re-upload it.`
-            );
+        const uniqueFileIds = [...new Set(pages.map((p) => p.fileId))];
+        const orderedFiles = uniqueFileIds.map((fileId) => {
+          const match = files.find((f) => f.id === fileId);
+          if (!match?.file) {
+            throw new Error(`"${match?.name ?? "A file"}" is missing. Please re-add it.`);
           }
-          return { fileId: serverId, pageIndex: p.pageIndex };
+          return match.file;
         });
 
-        blob = await mergePdfsViaApi({ mode: "pages", pages: apiPages });
+        blob = await mergePdfsFromLocalPages(
+          orderedFiles,
+          pages.map((p) => ({
+            fileIndex: uniqueFileIds.indexOf(p.fileId),
+            pageIndex: p.pageIndex,
+          }))
+        );
         setSuccessMessage(
           `Successfully merged ${pages.length} page${pages.length !== 1 ? "s" : ""} into one PDF.`
         );
@@ -177,16 +182,14 @@ export function MergePdfTool() {
           throw new Error("Select at least 2 PDF files to merge.");
         }
 
-        const fileIds = selectedFiles.map((f) => {
-          if (!f.serverId) {
-            throw new Error(
-              `"${f.name}" failed to upload. Please remove and re-add it.`
-            );
+        const localFiles = selectedFiles.map((f) => {
+          if (!f.file) {
+            throw new Error(`"${f.name}" is missing. Please remove and re-add it.`);
           }
-          return f.serverId;
+          return f.file;
         });
 
-        blob = await mergePdfsViaApi({ mode: "files", fileIds });
+        blob = await mergePdfsFromLocalFiles(localFiles);
         setSuccessMessage(
           `Successfully merged ${selectedFiles.length} PDF${selectedFiles.length !== 1 ? "s" : ""} into one document.`
         );
@@ -221,6 +224,7 @@ export function MergePdfTool() {
           ref={uploaderRef}
           category="pdf"
           multiple
+          localOnly
           showFileList="active-only"
           label="Drop PDF files here"
           description="or click to browse — select multiple files at once"

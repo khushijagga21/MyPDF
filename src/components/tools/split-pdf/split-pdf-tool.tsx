@@ -4,10 +4,9 @@ import { useState, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Scissors } from "lucide-react";
 import { getPdfPageCount } from "@/lib/utils/download";
-import { renderPdfThumbnails } from "@/lib/pdf/thumbnails";
-import { splitPdfViaApi } from "@/lib/pdf/client";
+import { renderPdfThumbnailsProgressive } from "@/lib/pdf/thumbnails";
+import { splitPdfViaFile } from "@/lib/pdf/client";
 import { FileUploader, type FileUploaderHandle } from "@/components/upload/file-uploader";
-import { deleteUploadedFileFromServer } from "@/lib/upload/client";
 import { PagePreviewGrid } from "@/components/tools/shared/page-preview-grid";
 import { OptionSelector } from "@/components/tools/shared/option-selector";
 import { DownloadPanel } from "@/components/tools/shared/download-panel";
@@ -70,14 +69,20 @@ export function SplitPdfTool() {
 
     setLoadingThumbnails(true);
     try {
-      const thumbnails = await renderPdfThumbnails(item.file);
-      setPreviewPages(
-        thumbnails.map((thumbnail, i) => ({
-          id: `page-${i + 1}`,
-          pageNumber: i + 1,
-          thumbnail,
-        }))
-      );
+      await renderPdfThumbnailsProgressive(item.file, {
+        scale: 0.28,
+        batchSize: 6,
+        onBatch: (batch, startIndex) => {
+          setPreviewPages((prev) => {
+            const next = [...prev];
+            batch.forEach((thumbnail, i) => {
+              const idx = startIndex + i;
+              if (next[idx]) next[idx] = { ...next[idx], thumbnail };
+            });
+            return next;
+          });
+        },
+      });
     } catch {
       // Keep placeholder previews if rendering fails
     } finally {
@@ -85,14 +90,7 @@ export function SplitPdfTool() {
     }
   };
 
-  const clearFile = async () => {
-    if (file?.serverId) {
-      try {
-        await deleteUploadedFileFromServer(file.serverId);
-      } catch {
-        // ignore
-      }
-    }
+  const clearFile = () => {
     setFile(null);
     setPreviewPages([]);
     resetOutput();
@@ -111,8 +109,8 @@ export function SplitPdfTool() {
   const baseName = file?.name.replace(/\.pdf$/i, "") ?? "document";
 
   const handleSplit = async () => {
-    if (!file?.serverId) {
-      setError("File is not on the server. Please re-upload your PDF.");
+    if (!file?.file) {
+      setError("Please select a PDF file first.");
       return;
     }
 
@@ -130,9 +128,8 @@ export function SplitPdfTool() {
         if (from > to) {
           throw new Error("Start page must be less than or equal to end page.");
         }
-        blob = await splitPdfViaApi({
+        blob = await splitPdfViaFile(file.file, {
           mode: "range",
-          fileId: file.serverId,
           from,
           to,
           baseName,
@@ -141,9 +138,8 @@ export function SplitPdfTool() {
         setOutputFileName(`${baseName}-pages-${from}-${to}.pdf`);
         setSuccessMessage(`Extracted pages ${from}–${to} into a new PDF.`);
       } else if (splitMode === "every") {
-        blob = await splitPdfViaApi({
+        blob = await splitPdfViaFile(file.file, {
           mode: "every",
-          fileId: file.serverId,
           every,
           baseName,
         });
@@ -160,9 +156,8 @@ export function SplitPdfTool() {
             : undefined;
         const count = pages?.length ?? pageCount;
 
-        blob = await splitPdfViaApi({
+        blob = await splitPdfViaFile(file.file, {
           mode: "individual",
-          fileId: file.serverId,
           pages,
           baseName,
         });
@@ -204,6 +199,7 @@ export function SplitPdfTool() {
             ref={uploaderRef}
             category="pdf"
             multiple={false}
+            localOnly
             label="Drop your PDF here"
             description="or click to browse your device"
             hint="Single file · Max 50 MB"

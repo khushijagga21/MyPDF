@@ -32,6 +32,8 @@ interface FileUploaderProps {
   compact?: boolean;
   hideDropZone?: boolean;
   showFileList?: boolean | "active-only";
+  /** Skip server upload — file stays in browser (faster for client-side tools) */
+  localOnly?: boolean;
 }
 
 export const FileUploader = forwardRef<FileUploaderHandle, FileUploaderProps>(
@@ -47,6 +49,7 @@ export const FileUploader = forwardRef<FileUploaderHandle, FileUploaderProps>(
       compact = false,
       hideDropZone = false,
       showFileList = true,
+      localOnly = false,
     },
     ref
   ) {
@@ -62,7 +65,7 @@ export const FileUploader = forwardRef<FileUploaderHandle, FileUploaderProps>(
       removeItem,
       retryItem,
       limits,
-    } = useFileUpload({ category, multiple, onFilesChange });
+    } = useFileUpload({ category, multiple, localOnly, onFilesChange });
 
     useImperativeHandle(ref, () => ({
       openFilePicker: () => inputRef.current?.click(),

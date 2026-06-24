@@ -97,6 +97,7 @@ export function WordToPdfTool() {
             key={uploadKey}
             category="word"
             multiple={false}
+            localOnly
             label="Drop your Word file here"
             description="or click to browse your device"
             hint="Single file · Max 50 MB · .docx only"

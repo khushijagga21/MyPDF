@@ -9,13 +9,16 @@ export const FILE_TTL_MS = 24 * 60 * 60 * 1000;
  * Production uses PostgreSQL for file bytes (works on Vercel, Railway, Render).
  * Local dev uses the uploads/ folder unless UPLOAD_STORAGE=database.
  */
-export function useDatabaseFileStorage(): boolean {
+export function shouldUseDatabaseFileStorage(): boolean {
   if (process.env.UPLOAD_STORAGE === "filesystem") return false;
   if (process.env.UPLOAD_STORAGE === "database") return true;
   if (process.env.NODE_ENV !== "production") return false;
   const url = process.env.DATABASE_URL ?? "";
   return url.startsWith("postgresql://") || url.startsWith("postgres://");
 }
+
+/** @deprecated Use shouldUseDatabaseFileStorage */
+export const useDatabaseFileStorage = shouldUseDatabaseFileStorage;
 
 export const MAX_FILE_SIZE_BYTES = 50 * 1024 * 1024; // 50 MB
 

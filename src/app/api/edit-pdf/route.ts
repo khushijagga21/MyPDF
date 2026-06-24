@@ -1,43 +1,78 @@
 import { NextResponse } from "next/server";
 import { editPdfPages } from "@/lib/pdf/edit";
 import type { EditPdfRequest } from "@/lib/pdf/types";
+import { PdfUploadError } from "@/lib/api/parse-pdf-upload";
 import { readUploadedFileBuffer } from "@/lib/upload/storage";
 import { logToolJob } from "@/lib/db/log-tool-job";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
-export async function POST(request: Request) {
-  try {
-    const body = (await request.json()) as EditPdfRequest;
+async function resolveEditInput(request: Request) {
+  const contentType = request.headers.get("content-type") ?? "";
 
-    if (!body?.fileId || !Array.isArray(body.pages) || body.pages.length === 0) {
-      return NextResponse.json({ error: "Invalid edit request." }, { status: 400 });
+  if (contentType.includes("multipart/form-data")) {
+    const formData = await request.formData();
+    const payloadRaw = formData.get("payload");
+    if (typeof payloadRaw !== "string") {
+      throw new PdfUploadError("Invalid edit request.", 400);
     }
 
-    const result = await readUploadedFileBuffer(body.fileId);
-    if (!result) {
-      return NextResponse.json(
-        { error: "Uploaded file not found. Please upload again." },
-        { status: 404 }
-      );
+    const body = JSON.parse(payloadRaw) as Omit<EditPdfRequest, "fileId">;
+    if (!Array.isArray(body.pages) || body.pages.length === 0) {
+      throw new PdfUploadError("Invalid edit request.", 400);
     }
 
+    const file = formData.get("file");
+    if (!file || !(file instanceof File)) {
+      throw new PdfUploadError("No PDF file provided.", 400);
+    }
+
+    const bytes = new Uint8Array(await file.arrayBuffer());
     const baseName =
       body.baseName?.replace(/\.pdf$/i, "") ||
-      result.meta.originalName.replace(/\.pdf$/i, "");
+      (file.name || "document").replace(/\.pdf$/i, "");
+
+    return { body, bytes, baseName, fileId: undefined as string | undefined };
+  }
+
+  const body = (await request.json()) as EditPdfRequest;
+  if (!body?.fileId || !Array.isArray(body.pages) || body.pages.length === 0) {
+    throw new PdfUploadError("Invalid edit request.", 400);
+  }
+
+  const result = await readUploadedFileBuffer(body.fileId);
+  if (!result) {
+    throw new PdfUploadError("Uploaded file not found. Please upload again.", 404);
+  }
+
+  const baseName =
+    body.baseName?.replace(/\.pdf$/i, "") ||
+    result.meta.originalName.replace(/\.pdf$/i, "");
+
+  return {
+    body,
+    bytes: new Uint8Array(result.buffer),
+    baseName,
+    fileId: body.fileId,
+  };
+}
+
+export async function POST(request: Request) {
+  try {
+    const { body, bytes, baseName, fileId } = await resolveEditInput(request);
 
     const pages = body.pages.map((p) => ({
       pageIndex: Number(p.pageIndex),
       rotation: Number(p.rotation) || 0,
     }));
 
-    const pdfBytes = await editPdfPages(new Uint8Array(result.buffer), pages);
+    const pdfBytes = await editPdfPages(bytes, pages);
 
     await logToolJob({
       tool: "edit-pdf",
-      inputFileIds: [body.fileId],
-      storedFileId: body.fileId,
+      inputFileIds: fileId ? [fileId] : [],
+      storedFileId: fileId ?? null,
       outputFileName: `${baseName}-edited.pdf`,
       outputSize: pdfBytes.length,
     });
@@ -51,6 +86,9 @@ export async function POST(request: Request) {
       },
     });
   } catch (err) {
+    if (err instanceof PdfUploadError) {
+      return NextResponse.json({ error: err.message }, { status: err.status });
+    }
     console.error("[edit-pdf POST]", err);
     const message = err instanceof Error ? err.message : "Failed to edit PDF.";
     return NextResponse.json({ error: message }, { status: 400 });

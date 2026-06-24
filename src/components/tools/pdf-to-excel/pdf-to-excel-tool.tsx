@@ -4,25 +4,20 @@ import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Table2 } from "lucide-react";
 import { FileUploader } from "@/components/upload/file-uploader";
-import { deleteUploadedFileFromServer } from "@/lib/upload/client";
 import { PagePreviewGrid } from "@/components/tools/shared/page-preview-grid";
 import { DownloadPanel } from "@/components/tools/shared/download-panel";
 import { GlassPanel, SectionHeading } from "@/components/tools/shared/glass-panel";
 import { SuccessToast } from "@/components/ui/success-toast";
 import { LoadingButton } from "@/components/ui/loading-button";
 import { Button } from "@/components/ui/button";
-import { getPdfPageCount } from "@/lib/utils/download";
-import { renderPdfThumbnails } from "@/lib/pdf/thumbnails";
-import { pdfToExcel } from "@/lib/excel/pdf-to-excel";
+import { usePdfUploadPreview } from "@/hooks/use-pdf-upload-preview";
+import { pdfToExcelViaFile } from "@/lib/excel/client";
 import { formatFileSize } from "@/lib/utils/format";
-import type { FileItemData } from "@/components/tools/shared/file-card";
-import type { DummyPage } from "@/lib/data/tool-dummy";
 
 export function PdfToExcelTool() {
   const [uploadKey, setUploadKey] = useState(0);
-  const [file, setFile] = useState<FileItemData | null>(null);
-  const [previewPages, setPreviewPages] = useState<DummyPage[]>([]);
-  const [loadingThumbnails, setLoadingThumbnails] = useState(false);
+  const { file, previewPages, loadingThumbnails, handleFilesChange } =
+    usePdfUploadPreview();
   const [processing, setProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
@@ -38,63 +33,22 @@ export function PdfToExcelTool() {
     setSuccessMessage(null);
   };
 
-  const handleFilesChange = async (uploaded: FileItemData[]) => {
-    const item = uploaded[0];
-    if (!item?.file) {
-      setFile(null);
-      setPreviewPages([]);
-      return;
-    }
-
-    const pageCount = await getPdfPageCount(item.file);
-    setFile({ ...item, pageCount });
-    setPreviewPages(
-      Array.from({ length: pageCount }, (_, i) => ({
-        id: `page-${i + 1}`,
-        pageNumber: i + 1,
-      }))
-    );
-    resetOutput();
-
-    setLoadingThumbnails(true);
-    try {
-      const thumbnails = await renderPdfThumbnails(item.file);
-      setPreviewPages(
-        thumbnails.map((thumbnail, i) => ({
-          id: `page-${i + 1}`,
-          pageNumber: i + 1,
-          thumbnail,
-        }))
-      );
-    } catch {
-      // Keep placeholders on failure
-    } finally {
-      setLoadingThumbnails(false);
-    }
-  };
-
-  const clearFile = async () => {
-    if (file?.serverId) {
-      try {
-        await deleteUploadedFileFromServer(file.serverId);
-      } catch {
-        // ignore
-      }
-    }
-    setFile(null);
-    setPreviewPages([]);
+  const clearFile = () => {
     resetOutput();
     setUploadKey((k) => k + 1);
   };
 
   const handleConvert = async () => {
-    if (!file?.file) return;
+    if (!file?.file) {
+      setError("Please select a PDF file first.");
+      return;
+    }
 
     setProcessing(true);
     resetOutput();
 
     try {
-      const blob = await pdfToExcel(file.file);
+      const blob = await pdfToExcelViaFile(file.file);
       setResultBlob(blob);
       setConverted(true);
       setSuccessMessage(
@@ -121,6 +75,7 @@ export function PdfToExcelTool() {
             key={uploadKey}
             category="pdf"
             multiple={false}
+            localOnly
             label="Drop your PDF here"
             description="or click to browse your device"
             hint="Single file · Max 50 MB"
@@ -142,7 +97,7 @@ export function PdfToExcelTool() {
                     {formatFileSize(file.size)} · {file.pageCount} pages
                   </p>
                 </div>
-                <Button variant="outline" size="sm" onClick={() => void clearFile()}>
+                <Button variant="outline" size="sm" onClick={clearFile}>
                   Change file
                 </Button>
               </div>

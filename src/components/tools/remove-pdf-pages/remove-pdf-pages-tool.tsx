@@ -4,10 +4,9 @@ import { useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Trash2 } from "lucide-react";
 import { getPdfPageCount } from "@/lib/utils/download";
-import { renderPdfThumbnails } from "@/lib/pdf/thumbnails";
-import { removePdfPagesViaApi } from "@/lib/pdf/client";
+import { renderPdfThumbnailsProgressive } from "@/lib/pdf/thumbnails";
+import { removePdfPagesViaFile } from "@/lib/pdf/client";
 import { FileUploader, type FileUploaderHandle } from "@/components/upload/file-uploader";
-import { deleteUploadedFileFromServer } from "@/lib/upload/client";
 import { PagePreviewGrid } from "@/components/tools/shared/page-preview-grid";
 import { DownloadPanel } from "@/components/tools/shared/download-panel";
 import { GlassPanel, SectionHeading } from "@/components/tools/shared/glass-panel";
@@ -63,14 +62,20 @@ export function RemovePdfPagesTool() {
 
     setLoadingThumbnails(true);
     try {
-      const thumbnails = await renderPdfThumbnails(item.file);
-      setPreviewPages(
-        thumbnails.map((thumbnail, i) => ({
-          id: `page-${i + 1}`,
-          pageNumber: i + 1,
-          thumbnail,
-        }))
-      );
+      await renderPdfThumbnailsProgressive(item.file, {
+        scale: 0.28,
+        batchSize: 6,
+        onBatch: (batch, startIndex) => {
+          setPreviewPages((prev) => {
+            const next = [...prev];
+            batch.forEach((thumbnail, i) => {
+              const idx = startIndex + i;
+              if (next[idx]) next[idx] = { ...next[idx], thumbnail };
+            });
+            return next;
+          });
+        },
+      });
     } catch {
       // Keep placeholders if thumbnails fail
     } finally {
@@ -78,14 +83,7 @@ export function RemovePdfPagesTool() {
     }
   };
 
-  const clearFile = async () => {
-    if (file?.serverId) {
-      try {
-        await deleteUploadedFileFromServer(file.serverId);
-      } catch {
-        // ignore
-      }
-    }
+  const clearFile = () => {
     setFile(null);
     setPreviewPages([]);
     setPagesToRemove([]);
@@ -103,8 +101,8 @@ export function RemovePdfPagesTool() {
   };
 
   const handleRemove = async () => {
-    if (!file?.serverId) {
-      setError("File is not on the server. Please re-upload your PDF.");
+    if (!file?.file) {
+      setError("Please select a PDF file first.");
       return;
     }
     if (pagesToRemove.length === 0) {
@@ -116,8 +114,7 @@ export function RemovePdfPagesTool() {
     resetOutput();
 
     try {
-      const blob = await removePdfPagesViaApi({
-        fileId: file.serverId,
+      const blob = await removePdfPagesViaFile(file.file, {
         removePages: [...pagesToRemove].sort((a, b) => a - b),
         baseName,
       });
@@ -147,6 +144,7 @@ export function RemovePdfPagesTool() {
             ref={uploaderRef}
             category="pdf"
             multiple={false}
+            localOnly
             label="Drop your PDF here"
             description="or click to browse your device"
             hint="Single file · Max 50 MB"

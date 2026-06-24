@@ -72,6 +72,14 @@ export interface EditPdfRequest {
   baseName?: string;
 }
 
+export type SplitPdfFilePayload =
+  | Omit<SplitPdfRangeRequest, "fileId">
+  | Omit<SplitPdfEveryRequest, "fileId">
+  | Omit<SplitPdfIndividualRequest, "fileId">;
+
+export type RemovePdfPagesFilePayload = Omit<RemovePdfPagesRequest, "fileId">;
+export type EditPdfFilePayload = Omit<EditPdfRequest, "fileId">;
+
 export interface PdfToPowerpointRequest {
   images: string[];
   baseName?: string;

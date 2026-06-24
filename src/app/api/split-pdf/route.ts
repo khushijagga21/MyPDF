@@ -6,6 +6,9 @@ import {
   splitIndividualPages,
 } from "@/lib/pdf/split";
 import type { SplitPdfRequest } from "@/lib/pdf/types";
+import {
+  PdfUploadError,
+} from "@/lib/api/parse-pdf-upload";
 import { readUploadedFileBuffer } from "@/lib/upload/storage";
 import { logToolJob } from "@/lib/db/log-tool-job";
 
@@ -17,25 +20,67 @@ async function loadPdfFile(fileId: string) {
   if (!result) {
     throw new Error("Uploaded file not found. Please upload again.");
   }
-  if (result.meta.category !== "pdf" && result.meta.mimeType !== "application/pdf") {
+  if (
+    result.meta.category !== "pdf" &&
+    result.meta.mimeType !== "application/pdf"
+  ) {
     throw new Error(`"${result.meta.originalName}" is not a PDF file.`);
   }
   const baseName = result.meta.originalName.replace(/\.pdf$/i, "");
   return {
     bytes: new Uint8Array(result.buffer),
     baseName,
+    fileId,
+  };
+}
+
+async function resolveSplitInput(request: Request) {
+  const contentType = request.headers.get("content-type") ?? "";
+
+  if (contentType.includes("multipart/form-data")) {
+    const formData = await request.formData();
+    const payloadRaw = formData.get("payload");
+    if (typeof payloadRaw !== "string") {
+      throw new PdfUploadError("Invalid split request.", 400);
+    }
+
+    const body = JSON.parse(payloadRaw) as Omit<SplitPdfRequest, "fileId">;
+    const file = formData.get("file");
+    if (!file || !(file instanceof File)) {
+      throw new PdfUploadError("No PDF file provided.", 400);
+    }
+
+    const bytes = new Uint8Array(await file.arrayBuffer());
+    if (bytes.length === 0) {
+      throw new PdfUploadError("The uploaded file is empty.", 400);
+    }
+
+    return {
+      body: { ...body, fileId: "" } as SplitPdfRequest,
+      bytes,
+      baseName: (file.name || "document").replace(/\.pdf$/i, ""),
+      fileId: undefined as string | undefined,
+    };
+  }
+
+  const body = (await request.json()) as SplitPdfRequest;
+  if (!body?.mode || !body.fileId) {
+    throw new PdfUploadError("Invalid split request.", 400);
+  }
+
+  const loaded = await loadPdfFile(body.fileId);
+  return {
+    body,
+    bytes: loaded.bytes,
+    baseName: loaded.baseName,
+    fileId: loaded.fileId,
   };
 }
 
 export async function POST(request: Request) {
   try {
-    const body = (await request.json()) as SplitPdfRequest;
-
-    if (!body?.mode || !body.fileId) {
-      return NextResponse.json({ error: "Invalid split request." }, { status: 400 });
-    }
-
-    const { bytes, baseName: defaultBaseName } = await loadPdfFile(body.fileId);
+    const { body, bytes, baseName: defaultBaseName, fileId } =
+      await resolveSplitInput(request);
     const baseName = body.baseName?.replace(/\.pdf$/i, "") || defaultBaseName;
 
     if (body.mode === "range") {
@@ -53,7 +98,7 @@ export async function POST(request: Request) {
 
       await logToolJob({
         tool: "split-pdf",
-        inputFileIds: [body.fileId],
+        inputFileIds: fileId ? [fileId] : [],
         outputFileName: `${baseName}-pages-${from}-${to}.pdf`,
         outputSize: pdfBytes.length,
       });
@@ -82,7 +127,7 @@ export async function POST(request: Request) {
 
       await logToolJob({
         tool: "split-pdf",
-        inputFileIds: [body.fileId],
+        inputFileIds: fileId ? [fileId] : [],
         outputFileName: `${baseName}-split.zip`,
         outputSize: zipBytes.length,
       });
@@ -108,7 +153,7 @@ export async function POST(request: Request) {
 
       await logToolJob({
         tool: "split-pdf",
-        inputFileIds: [body.fileId],
+        inputFileIds: fileId ? [fileId] : [],
         outputFileName: `${baseName}-pages.zip`,
         outputSize: zipBytes.length,
       });
@@ -125,6 +170,9 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ error: "Invalid split mode." }, { status: 400 });
   } catch (err) {
+    if (err instanceof PdfUploadError) {
+      return NextResponse.json({ error: err.message }, { status: err.status });
+    }
     console.error("[split-pdf POST]", err);
     const message =
       err instanceof Error ? err.message : "Failed to split PDF.";

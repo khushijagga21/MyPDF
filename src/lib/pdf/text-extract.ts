@@ -1,18 +1,4 @@
-"use client";
-
-type PdfJsModule = typeof import("pdfjs-dist");
-
-let pdfjsPromise: Promise<PdfJsModule> | null = null;
-
-async function getPdfJs(): Promise<PdfJsModule> {
-  if (!pdfjsPromise) {
-    pdfjsPromise = import("pdfjs-dist").then((pdfjs) => {
-      pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
-      return pdfjs;
-    });
-  }
-  return pdfjsPromise;
-}
+import { loadPdfJsServer } from "@/lib/pdf/pdfjs-server";
 
 async function toArrayBuffer(
   source: File | ArrayBuffer | Uint8Array
@@ -25,13 +11,18 @@ async function toArrayBuffer(
   ) as ArrayBuffer;
 }
 
-/** Extract plain text from each PDF page */
+/** Extract plain text from each PDF page (server-safe). */
 export async function extractPdfPageTexts(
   source: File | ArrayBuffer | Uint8Array
 ): Promise<string[]> {
-  const pdfjs = await getPdfJs();
-  const data = await toArrayBuffer(source);
-  const pdf = await pdfjs.getDocument({ data }).promise;
+  const pdfjs = await loadPdfJsServer();
+  const data = new Uint8Array(await toArrayBuffer(source));
+  const pdf = await pdfjs.getDocument({
+    data,
+    useSystemFonts: true,
+    useWorkerFetch: false,
+  }).promise;
+
   const pages: string[] = [];
 
   for (let i = 1; i <= pdf.numPages; i++) {

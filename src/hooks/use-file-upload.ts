@@ -14,6 +14,8 @@ import type { FileItemData } from "@/components/tools/shared/file-card";
 interface UseFileUploadOptions {
   category: UploadCategory;
   multiple?: boolean;
+  /** Keep files local only — skips slow server upload when processing happens in-browser */
+  localOnly?: boolean;
   onFilesChange?: (files: FileItemData[]) => void;
 }
 
@@ -41,6 +43,7 @@ function toFileItemData(item: UploadItem, category: UploadCategory): FileItemDat
 export function useFileUpload({
   category,
   multiple = true,
+  localOnly = false,
   onFilesChange,
 }: UseFileUploadOptions) {
   const [items, setItems] = useState<UploadItem[]>([]);
@@ -52,11 +55,15 @@ export function useFileUpload({
     (nextItems: UploadItem[]) => {
       if (!onFilesChange) return;
       const ready = nextItems
-        .filter((i) => i.status === "success" && i.localFile)
+        .filter(
+          (i) =>
+            i.localFile &&
+            (localOnly ? i.status !== "error" : i.status === "success")
+        )
         .map((i) => toFileItemData(i, category));
       onFilesChange(ready);
     },
-    [category, onFilesChange]
+    [category, localOnly, onFilesChange]
   );
 
   const uploadOne = useCallback(
@@ -135,8 +142,8 @@ export function useFileUpload({
           name: file.name,
           size: file.size,
           mimeType: file.type,
-          status: "pending" as const,
-          progress: 0,
+          status: localOnly ? ("success" as const) : ("pending" as const),
+          progress: localOnly ? 100 : 0,
           localFile: file,
           previewUrl,
         };
@@ -163,13 +170,17 @@ export function useFileUpload({
 
       setItems(combined);
 
-      for (const item of newItems) {
-        if (item.localFile) {
-          void uploadOne(item.clientId, item.localFile);
+      if (localOnly) {
+        notifyChange(combined);
+      } else {
+        for (const item of newItems) {
+          if (item.localFile) {
+            void uploadOne(item.clientId, item.localFile);
+          }
         }
       }
     },
-    [category, multiple, uploadOne]
+    [category, localOnly, multiple, notifyChange, uploadOne]
   );
 
   const removeItem = useCallback(

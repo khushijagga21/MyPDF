@@ -3,9 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev --turbopack",
-    "dev:webpack": "next dev",
-    "build": "prisma generate && next build",
+    "dev": "next dev",
+    "dev:turbo": "next dev --turbopack",
+    "build": "prisma generate && prisma db push --skip-generate && next build",
     "postinstall": "prisma generate",
     "start": "next start",
     "start:prod": "prisma db push && next start",
