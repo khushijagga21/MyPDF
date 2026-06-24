@@ -17,14 +17,6 @@ export async function extractPdfPageTexts(
 ): Promise<string[]> {
   const pdfjs = await loadPdfJsServer();
   const data = new Uint8Array(await toArrayBuffer(source));
-  // Vercel/Node server builds can't load the PDF.js worker chunk reliably.
-  // Force workerless mode to avoid `Setting up fake worker failed` errors.
-  try {
-    if (pdfjs.GlobalWorkerOptions) pdfjs.GlobalWorkerOptions.workerSrc = "";
-  } catch {
-    // ignore
-  }
-
   const pdf = await pdfjs.getDocument(
     {
       data,
