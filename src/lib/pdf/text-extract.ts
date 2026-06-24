@@ -17,11 +17,21 @@ export async function extractPdfPageTexts(
 ): Promise<string[]> {
   const pdfjs = await loadPdfJsServer();
   const data = new Uint8Array(await toArrayBuffer(source));
-  const pdf = await pdfjs.getDocument({
-    data,
-    useSystemFonts: true,
-    useWorkerFetch: false,
-  }).promise;
+  // Vercel/Node server builds can't load the PDF.js worker chunk reliably.
+  // Force workerless mode to avoid `Setting up fake worker failed` errors.
+  try {
+    if (pdfjs.GlobalWorkerOptions) pdfjs.GlobalWorkerOptions.workerSrc = "";
+  } catch {
+    // ignore
+  }
+
+  const pdf = await pdfjs.getDocument(
+    {
+      data,
+      disableWorker: true,
+      useSystemFonts: true,
+    } as unknown as Record<string, unknown>
+  ).promise;
 
   const pages: string[] = [];
 
