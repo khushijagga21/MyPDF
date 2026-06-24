@@ -24,12 +24,6 @@ function parseCategory(value: string | null): UploadCategory {
 export async function POST(request: Request) {
   try {
     const userId = await getSessionUserId();
-    if (!userId) {
-      return NextResponse.json(
-        { error: "Sign in required to upload files." },
-        { status: 401 }
-      );
-    }
 
     await ensureUploadDirs();
 
@@ -59,7 +53,7 @@ export async function POST(request: Request) {
     const safeName = sanitizeFileName(file.name);
     const storedName = `${id}-${safeName}`;
     const buffer = Buffer.from(await file.arrayBuffer());
-    const sessionUserId = userId;
+    const sessionUserId = userId ?? null;
 
     const record: UploadedFileRecord = {
       id,

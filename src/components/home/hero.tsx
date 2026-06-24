@@ -17,7 +17,7 @@ export function Hero() {
         >
           <Badge variant="secondary" className="mb-6 px-4 py-1.5">
             <Sparkles className="h-3.5 w-3.5 mr-1.5" />
-            Sign in to save your files · Free account
+            Free to use · No account needed
           </Badge>
         </motion.div>
 
@@ -56,7 +56,7 @@ export function Hero() {
             </Link>
           </Button>
           <Button variant="glass" size="lg" asChild>
-            <Link href="/register">Sign up free</Link>
+            <Link href="/#tools">Browse tools</Link>
           </Button>
         </motion.div>
 
