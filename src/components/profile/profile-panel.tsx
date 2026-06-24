@@ -143,7 +143,7 @@ export function ProfilePanel() {
       <GlassPanel delay={0.05}>
         <SectionHeading
           title="Updated documents"
-          description="PDFs you processed with merge, split, edit, and other tools"
+          description="Your recent tool activity (these entries reference the source upload)"
         />
         {processed.length === 0 ? (
           <p className="text-sm text-muted-foreground py-4 text-center">
@@ -182,12 +182,18 @@ export function ProfilePanel() {
                     </div>
                   </div>
                   {item.sourceFile && (
-                    <Button variant="ghost" size="sm" asChild className="shrink-0">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      asChild
+                      className="shrink-0"
+                    >
                       <a
                         href={`/api/upload/${item.sourceFile.id}`}
                         download={item.sourceFile.originalName}
                       >
                         <Download className="h-4 w-4" aria-hidden />
+                        Source
                       </a>
                     </Button>
                   )}
