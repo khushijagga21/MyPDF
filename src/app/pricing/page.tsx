@@ -84,15 +84,7 @@ export default function PricingPage() {
               className="w-full"
               asChild
             >
-              <Link
-                href={
-                  plan.id === "team"
-                    ? "/contact"
-                    : plan.id === "free"
-                      ? "/merge-pdf"
-                      : "#"
-                }
-              >
+              <Link href={plan.id === "team" ? "/contact" : "#"}>
                 {plan.cta}
               </Link>
             </Button>

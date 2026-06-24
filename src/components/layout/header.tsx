@@ -7,6 +7,7 @@ import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { Menu, X, FileText } from "lucide-react";
 import { ThemeToggle } from "@/components/layout/theme-toggle";
 import { ToolsDropdown } from "@/components/layout/tools-dropdown";
+import { AuthNav, MobileAuthLinks } from "@/components/auth/auth-nav";
 import { availableTools } from "@/lib/data/tools";
 import { BRAND_NAME } from "@/lib/brand";
 import { Button } from "@/components/ui/button";
@@ -102,6 +103,7 @@ export function Header() {
 
           <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
             <ThemeToggle />
+            <AuthNav />
             <Button variant="default" size="sm" className="hidden sm:inline-flex" asChild>
               <Link href="/merge-pdf">Get Started</Link>
             </Button>
@@ -207,6 +209,13 @@ export function Header() {
                       </Link>
                     </li>
                   ))}
+                  <MobileAuthLinks
+                    pathname={pathname}
+                    onNavigate={closeMenu}
+                    linkClass={(active) =>
+                      cn(navLinkClass(active), "block w-full text-left")
+                    }
+                  />
                 </ul>
               </nav>
               <div className="mt-3 border-t border-white/10 pt-3">

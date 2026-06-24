@@ -22,7 +22,8 @@ export const faqItems: FAQItem[] = [
   {
     id: "3",
     question: "Do I need to create an account?",
-    answer: `No. ${BRAND_NAME} is free to use without signing up. Open a tool, upload your file, and download the result.`,
+    answer:
+      `Yes. Sign up for a free account to use ${BRAND_NAME}. Your uploads and processed documents are saved to your profile.`,
   },
   {
     id: "4",
