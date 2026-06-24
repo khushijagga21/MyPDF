@@ -7,6 +7,7 @@ import { canAccessFile } from "@/lib/db/files";
 import { getSessionUserId } from "@/lib/auth/session";
 
 export const runtime = "nodejs";
+export const maxDuration = 60;
 
 type RouteContext = { params: Promise<{ id: string }> };
 

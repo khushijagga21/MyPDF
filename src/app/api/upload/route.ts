@@ -8,6 +8,7 @@ import { getSessionUserId } from "@/lib/auth/session";
 import { logFileHistory } from "@/lib/db/files";
 
 export const runtime = "nodejs";
+export const maxDuration = 60;
 
 function parseCategory(value: string | null): UploadCategory {
   if (
@@ -75,21 +76,32 @@ export async function POST(request: Request) {
 
     await saveUploadedFile(id, buffer, record, sessionUserId);
 
-    await logFileHistory({
-      userId: sessionUserId,
-      tool: "upload",
-      inputFileIds: [id],
-      storedFileId: id,
-      outputFileName: file.name,
-      outputSize: file.size,
-      status: "completed",
-    });
+    try {
+      await logFileHistory({
+        userId: sessionUserId,
+        tool: "upload",
+        inputFileIds: [id],
+        storedFileId: id,
+        outputFileName: file.name,
+        outputSize: file.size,
+        status: "completed",
+      });
+    } catch (historyErr) {
+      console.error("[upload POST] history log failed", historyErr);
+    }
 
     return NextResponse.json(record, { status: 201 });
   } catch (err) {
     console.error("[upload POST]", err);
+    const message =
+      err instanceof Error ? err.message : "Internal server error during upload.";
     return NextResponse.json(
-      { error: "Internal server error during upload." },
+      {
+        error:
+          process.env.NODE_ENV === "development"
+            ? message
+            : "Internal server error during upload.",
+      },
       { status: 500 }
     );
   }

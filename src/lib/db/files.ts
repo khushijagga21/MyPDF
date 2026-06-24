@@ -3,7 +3,8 @@ import { isDatabaseConfigured, prisma } from "@/lib/db/prisma";
 
 export async function persistFileRecord(
   record: UploadedFileRecord,
-  userId?: string | null
+  userId?: string | null,
+  data?: Buffer | null
 ): Promise<void> {
   if (!isDatabaseConfigured()) return;
 
@@ -17,12 +18,24 @@ export async function persistFileRecord(
       mimeType: record.mimeType,
       size: record.size,
       category: record.category,
+      data: data ?? null,
       createdAt: new Date(record.createdAt),
     },
     update: {
       userId: userId ?? undefined,
+      ...(data !== undefined ? { data } : {}),
     },
   });
+}
+
+export async function readFileDataFromDb(id: string): Promise<Buffer | null> {
+  if (!isDatabaseConfigured()) return null;
+  const file = await prisma.storedFile.findUnique({
+    where: { id },
+    select: { data: true },
+  });
+  if (!file?.data) return null;
+  return Buffer.from(file.data);
 }
 
 export async function removeFileRecord(id: string): Promise<void> {

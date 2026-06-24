@@ -3,6 +3,7 @@ import { imagesToPptx } from "@/lib/pdf/pdf-to-pptx";
 import { logToolJob } from "@/lib/db/log-tool-job";
 
 export const runtime = "nodejs";
+export const maxDuration = 60;
 
 interface PdfToPowerpointRequest {
   images: string[];

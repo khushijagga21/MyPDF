@@ -5,6 +5,7 @@ import { readUploadedFileBuffer } from "@/lib/upload/storage";
 import { logToolJob } from "@/lib/db/log-tool-job";
 
 export const runtime = "nodejs";
+export const maxDuration = 60;
 
 export async function POST(request: Request) {
   try {

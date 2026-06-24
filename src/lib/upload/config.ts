@@ -2,6 +2,13 @@ import type { UploadCategory } from "@/lib/upload/types";
 
 export const UPLOAD_DIR = "uploads";
 
+/** Vercel serverless has a read-only filesystem — store file bytes in PostgreSQL instead. */
+export function useDatabaseFileStorage(): boolean {
+  return (
+    process.env.VERCEL === "1" || process.env.UPLOAD_STORAGE === "database"
+  );
+}
+
 export const MAX_FILE_SIZE_BYTES = 50 * 1024 * 1024; // 50 MB
 
 export const CATEGORY_LIMITS: Record<

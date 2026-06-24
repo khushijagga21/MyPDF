@@ -28,6 +28,7 @@ model StoredFile {
   mimeType     String
   size         Int
   category     String
+  data         Bytes?
   createdAt    DateTime      @default(now())
   history      FileHistory[]
 

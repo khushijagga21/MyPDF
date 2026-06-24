@@ -10,6 +10,7 @@ import { readUploadedFileBuffer } from "@/lib/upload/storage";
 import { logToolJob } from "@/lib/db/log-tool-job";
 
 export const runtime = "nodejs";
+export const maxDuration = 60;
 
 async function loadPdfFile(fileId: string) {
   const result = await readUploadedFileBuffer(fileId);

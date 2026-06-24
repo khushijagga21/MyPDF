@@ -1,10 +1,11 @@
 import { promises as fs } from "fs";
 import path from "path";
-import { UPLOAD_DIR } from "@/lib/upload/config";
+import { UPLOAD_DIR, useDatabaseFileStorage } from "@/lib/upload/config";
 import type { UploadedFileRecord } from "@/lib/upload/types";
 import {
   getFileOwnerId,
   persistFileRecord,
+  readFileDataFromDb,
   recordFromDb,
   removeFileRecord,
 } from "@/lib/db/files";
@@ -18,6 +19,7 @@ export function getUploadsPath(): string {
 }
 
 export async function ensureUploadDirs(): Promise<void> {
+  if (useDatabaseFileStorage()) return;
   await fs.mkdir(UPLOADS_PATH, { recursive: true });
   await fs.mkdir(META_DIR, { recursive: true });
 }
@@ -36,6 +38,14 @@ export async function saveUploadedFile(
   record: UploadedFileRecord,
   userId?: string | null
 ): Promise<void> {
+  if (useDatabaseFileStorage()) {
+    if (!isDatabaseConfigured()) {
+      throw new Error("Database is not configured for file storage.");
+    }
+    await persistFileRecord({ ...record, userId: userId ?? null }, userId, buffer);
+    return;
+  }
+
   await ensureUploadDirs();
   await fs.writeFile(filePath(record.storedName), buffer);
   await fs.writeFile(metaPath(id), JSON.stringify(record, null, 2), "utf-8");
@@ -54,6 +64,8 @@ export async function getUploadedFileMeta(
     }
   }
 
+  if (useDatabaseFileStorage()) return null;
+
   try {
     const raw = await fs.readFile(metaPath(id), "utf-8");
     return JSON.parse(raw) as UploadedFileRecord;
@@ -68,27 +80,40 @@ export async function readUploadedFileBuffer(id: string): Promise<{
 } | null> {
   const meta = await getUploadedFileMeta(id);
   if (!meta) return null;
+
+  if (useDatabaseFileStorage()) {
+    const buffer = await readFileDataFromDb(id);
+    if (!buffer) return null;
+    return { meta, buffer };
+  }
+
   try {
     const buffer = await fs.readFile(filePath(meta.storedName));
     return { meta, buffer };
   } catch {
-    return null;
+    const buffer = await readFileDataFromDb(id);
+    if (!buffer) return null;
+    return { meta, buffer };
   }
 }
 
 export async function deleteUploadedFile(id: string): Promise<boolean> {
   const meta = await getUploadedFileMeta(id);
   if (!meta) return false;
-  try {
-    await fs.unlink(filePath(meta.storedName));
-  } catch {
-    // file may already be gone
+
+  if (!useDatabaseFileStorage()) {
+    try {
+      await fs.unlink(filePath(meta.storedName));
+    } catch {
+      // file may already be gone
+    }
+    try {
+      await fs.unlink(metaPath(id));
+    } catch {
+      // meta may already be gone
+    }
   }
-  try {
-    await fs.unlink(metaPath(id));
-  } catch {
-    // meta may already be gone
-  }
+
   await removeFileRecord(id);
   return true;
 }
