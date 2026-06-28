@@ -29,6 +29,14 @@ const nextConfig: NextConfig = {
     "dommatrix",
     "pdfjs-dist",
   ],
+  outputFileTracingIncludes: {
+    "/api/pdf-to-word": [
+      "./node_modules/pdfjs-dist/legacy/build/pdf.worker.mjs",
+    ],
+    "/api/pdf-to-excel": [
+      "./node_modules/pdfjs-dist/legacy/build/pdf.worker.mjs",
+    ],
+  },
   async redirects() {
     return toolShortUrls
       .filter(({ source, destination }) => source !== destination)

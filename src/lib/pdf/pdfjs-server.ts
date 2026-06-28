@@ -1,17 +1,22 @@
 import { ensurePdfDomPolyfills } from "@/lib/pdf/dom-polyfills";
-import { createRequire } from "module";
-import { pathToFileURL } from "url";
+
+type PdfJsModule = typeof import("pdfjs-dist/legacy/build/pdf.mjs");
+
+let pdfJsPromise: Promise<PdfJsModule> | null = null;
 
 /** Server-side PDF.js loader (Node.js — no browser worker). */
-export async function loadPdfJsServer() {
+export async function loadPdfJsServer(): Promise<PdfJsModule> {
   await ensurePdfDomPolyfills();
-  const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
 
-  // PDF.js defaults workerSrc to "./pdf.worker.mjs" on Node. Bundlers rewrite that
-  // to a missing .next/server/chunks path on Vercel — always use node_modules.
-  const require = createRequire(import.meta.url);
-  const workerPath = require.resolve("pdfjs-dist/legacy/build/pdf.worker.mjs");
-  pdfjs.GlobalWorkerOptions.workerSrc = pathToFileURL(workerPath).href;
+  if (!pdfJsPromise) {
+    pdfJsPromise = (async () => {
+      // pdf.worker.mjs sets globalThis.pdfjsWorker.WorkerMessageHandler.
+      // That lets PDF.js skip dynamic import("./pdf.worker.mjs"), which breaks
+      // on Vercel when bundled into .next/server/chunks/.
+      await import("pdfjs-dist/legacy/build/pdf.worker.mjs");
+      return import("pdfjs-dist/legacy/build/pdf.mjs");
+    })();
+  }
 
-  return pdfjs;
+  return pdfJsPromise;
 }
