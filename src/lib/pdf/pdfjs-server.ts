@@ -7,17 +7,11 @@ export async function loadPdfJsServer() {
   await ensurePdfDomPolyfills();
   const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
 
-  // Ensure the worker entry resolves from node_modules at runtime (Vercel-safe).
-  // Otherwise PDF.js tries to import a bundled chunk path that may not exist.
-  try {
-    if (pdfjs.GlobalWorkerOptions && !pdfjs.GlobalWorkerOptions.workerSrc) {
-      const require = createRequire(import.meta.url);
-      const workerPath = require.resolve("pdfjs-dist/legacy/build/pdf.worker.mjs");
-      pdfjs.GlobalWorkerOptions.workerSrc = pathToFileURL(workerPath).toString();
-    }
-  } catch {
-    // ignore; text-extract uses workerless fallback flags too
-  }
+  // PDF.js defaults workerSrc to "./pdf.worker.mjs" on Node. Bundlers rewrite that
+  // to a missing .next/server/chunks path on Vercel — always use node_modules.
+  const require = createRequire(import.meta.url);
+  const workerPath = require.resolve("pdfjs-dist/legacy/build/pdf.worker.mjs");
+  pdfjs.GlobalWorkerOptions.workerSrc = pathToFileURL(workerPath).href;
 
   return pdfjs;
 }
